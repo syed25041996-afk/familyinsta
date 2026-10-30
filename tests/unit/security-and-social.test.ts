@@ -31,7 +31,7 @@ import {
 	createFamilyPost,
 	getChronologicalFeed
 } from '../../src/lib/server/services/social.js';
-import { t } from '../../src/lib/i18n/index.js';
+import { t } from '../../mobile/src/i18n/strings.js';
 import { db, ensureSchema } from '../../src/lib/server/db/index.js';
 import { users, invites, childApprovedContacts, mediaItems } from '../../src/lib/server/db/schema.js';
 

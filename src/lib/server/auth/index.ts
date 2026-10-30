@@ -9,7 +9,7 @@ import {
 	childApprovedContacts,
 	notificationPreferences
 } from '../db/schema.js';
-import { eq, and, gt, isNull, or } from 'drizzle-orm';
+import { eq, and, gt, isNull } from 'drizzle-orm';
 
 export const SESSION_COOKIE_NAME = 'kinship_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days

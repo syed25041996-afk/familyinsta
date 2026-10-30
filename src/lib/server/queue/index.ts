@@ -3,7 +3,7 @@ import path from 'node:path';
 import archiver from 'archiver';
 import fsSync from 'node:fs';
 import { db, ensureSchema } from '../db/index.js';
-import { backgroundJobs, backupRuns, stories } from '../db/schema.js';
+import { backgroundJobs, backupRuns } from '../db/schema.js';
 import { eq, and, lte } from 'drizzle-orm';
 import { processMediaItem, getMediaRoot } from '../media/processor.js';
 import { broadcastToUser } from '../ws/hub.js';

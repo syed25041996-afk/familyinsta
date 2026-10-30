@@ -10,16 +10,11 @@ import {
 	mediaItems,
 	stories,
 	storyViews,
-	highlights,
-	highlightItems,
 	albums,
 	albumContributors,
-	albumMedia,
-	conversations,
-	conversationMembers,
-	messages
+	albumMedia
 } from '../db/schema.js';
-import { eq, desc, asc, and, gt, inArray, ilike, or, sql } from 'drizzle-orm';
+import { eq, desc, asc, and, gt, inArray, ilike, or } from 'drizzle-orm';
 import { getVisibleUserIdsForViewer } from '../auth/index.js';
 import { formatMediaForClient, signMediaUrl } from '../media/signer.js';
 import { createNotification } from '../push/index.js';

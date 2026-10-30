@@ -57,18 +57,6 @@ export const sessions = pgTable(
 	})
 );
 
-export const passkeys = pgTable('passkeys', {
-	id: text('id').primaryKey(), // Base64URL credential ID
-	userId: uuid('user_id')
-		.notNull()
-		.references(() => users.id, { onDelete: 'cascade' }),
-	publicKey: text('public_key').notNull(),
-	counter: integer('counter').default(0).notNull(),
-	deviceName: text('device_name').default('Passkey Device').notNull(),
-	transports: text('transports').default('[]').notNull(),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-});
-
 export const passwordResets = pgTable('password_resets', {
 	id: uuid('id').defaultRandom().primaryKey(),
 	userId: uuid('user_id')
