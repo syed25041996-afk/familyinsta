@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const SERVER_URL_KEY = 'kinship_server_url';
 const SESSION_TOKEN_KEY = 'kinship_session_token';
