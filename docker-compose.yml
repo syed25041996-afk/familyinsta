@@ -1,0 +1,245 @@
+name: kinship-familygram
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL 16 Database (~80 MB idle RAM)
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: kinship-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kinship}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kinship_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-kinship}
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "max_connections=50"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kinship} -d ${POSTGRES_DB:-kinship}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 2. Core Web + API + WebSocket Server (~120 MB idle RAM)
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kinship-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      PUBLIC_APP_NAME: ${PUBLIC_APP_NAME:-Kinship Family}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kinship}:${POSTGRES_PASSWORD:-kinship_secret}@db:5432/${POSTGRES_DB:-kinship}
+      SESSION_SECRET: ${SESSION_SECRET:-change_me_session_secret}
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-change_me_media_secret}
+      MEDIA_ROOT: /data/media
+      BACKUP_ROOT: /data/backups
+      STORAGE_QUOTA_GB: ${STORAGE_QUOTA_GB:-180}
+      MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-50}
+      MAX_VIDEO_SIZE_MB: ${MAX_VIDEO_SIZE_MB:-2048}
+      RP_ID: ${RP_ID:-localhost}
+      RP_NAME: ${RP_NAME:-Kinship Family}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - media_data:/data/media
+      - backup_data:/data/backups
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 3. Background Media Worker (sharp + ffmpeg + story expiry + cron)
+  # ----------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kinship-worker
+    restart: unless-stopped
+    command: ["node", "--import", "tsx", "src/lib/server/worker-entry.ts"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kinship}:${POSTGRES_PASSWORD:-kinship_secret}@db:5432/${POSTGRES_DB:-kinship}
+      MEDIA_ROOT: /data/media
+      BACKUP_ROOT: /data/backups
+      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+    volumes:
+      - media_data:/data/media
+      - backup_data:/data/backups
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 4. Automated Nightly Backup Service (pg_dump + media sync + pruning)
+  # ----------------------------------------------------------------------------
+  backup:
+    image: postgres:16-alpine
+    container_name: kinship-backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-kinship}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-kinship_secret}
+      PGDATABASE: ${POSTGRES_DB:-kinship}
+      MEDIA_ROOT: /data/media
+      BACKUP_ROOT: /data/backups
+      BACKUP_KEEP_DAILY: ${BACKUP_KEEP_DAILY:-7}
+      BACKUP_KEEP_WEEKLY: ${BACKUP_KEEP_WEEKLY:-4}
+      BACKUP_KEEP_MONTHLY: ${BACKUP_KEEP_MONTHLY:-6}
+    volumes:
+      - media_data:/data/media:ro
+      - backup_data:/data/backups
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./scripts/restore.sh:/usr/local/bin/restore.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "0 2 * * * /bin/sh /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+        crond -f -l 8
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 5. Reverse Proxy with Automatic HTTPS (Profile: public)
+  #    Enable with: docker compose --profile public up -d
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: kinship-caddy
+    profiles: ["public"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 6. Cloudflare Zero-Trust Tunnel — No Open Router Ports (Profile: tunnel)
+  #    Enable with: docker compose --profile tunnel up -d
+  # ----------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: kinship-cloudflared
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 7. Tailscale Mesh VPN Sidecar — Private Family Access (Profile: vpn)
+  #    Enable with: docker compose --profile vpn up -d
+  # ----------------------------------------------------------------------------
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: kinship-tailscale
+    profiles: ["vpn"]
+    restart: unless-stopped
+    hostname: ${TS_HOSTNAME:-kinship-family}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/tailscale-serve.json
+      TS_USERSPACE: "false"
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      - kinship_net
+
+  # ----------------------------------------------------------------------------
+  # 8. Optional ClamAV Virus Scanner (Profile: antivirus)
+  #    Enable with: docker compose --profile antivirus up -d
+  # ----------------------------------------------------------------------------
+  clamav:
+    image: clamav/clamav:stable
+    container_name: kinship-clamav
+    profiles: ["antivirus"]
+    restart: unless-stopped
+    volumes:
+      - clamav_db:/var/lib/clamav
+    networks:
+      - kinship_net
+
+volumes:
+  pgdata:
+  media_data:
+  backup_data:
+  caddy_data:
+  caddy_config:
+  tailscale_state:
+  clamav_db:
+
+networks:
+  kinship_net:
+    driver: bridge

@@ -1,0 +1,10 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { SESSION_COOKIE_NAME, invalidateSession } from '$lib/server/auth/index.js';
+
+export const POST: RequestHandler = async ({ cookies }) => {
+	const token = cookies.get(SESSION_COOKIE_NAME);
+	await invalidateSession(token);
+	cookies.delete(SESSION_COOKIE_NAME, { path: '/' });
+	return json({ ok: true });
+};

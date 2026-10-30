@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	html.text-scale-normal {
+		font-size: 16px;
+	}
+	html.text-scale-large {
+		font-size: 18.5px;
+	}
+	html.text-scale-xlarge {
+		font-size: 21px;
+	}
+
+	/* Accessible WCAG AA focus indicators */
+	*:focus-visible {
+		outline: 2px solid #dc5b4d;
+		outline-offset: 2px;
+	}
+}
+
+/* Hide scrollbars on horizontal stories bar while keeping scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+.no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
