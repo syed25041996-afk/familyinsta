@@ -8,9 +8,8 @@ import {
 	StyleSheet,
 	Alert
 } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import { useAuth } from '../../src/context/AuthContext';
-import { apiFetch } from '../../src/api/client';
+import { apiFetch, connectMobileWebSocket } from '../../src/api/client';
 import { t } from '../../src/i18n/strings';
 
 export default function MobileActivityScreen() {
@@ -27,6 +26,14 @@ export default function MobileActivityScreen() {
 
 	useEffect(() => {
 		loadActivity();
+		const ws = connectMobileWebSocket((event) => {
+			if (event.type === 'notification:new') {
+				loadActivity();
+			}
+		});
+		return () => {
+			ws?.close();
+		};
 	}, []);
 
 	async function loadActivity() {
@@ -56,12 +63,11 @@ export default function MobileActivityScreen() {
 	}
 
 	async function enableMobilePush() {
-		const { status } = await Notifications.requestPermissionsAsync();
-		if (status !== 'granted') {
-			Alert.alert('Permission Needed', 'Enable notifications in your phone Settings.');
-			return;
-		}
-		Alert.alert('Push Enabled', 'Native mobile push notifications are active!');
+		await togglePref('webPushEnabled');
+		Alert.alert(
+			'Live Notifications Active',
+			'Real-time Home Lab notifications are enabled for your account.'
+		);
 	}
 
 	return (
