@@ -9,7 +9,7 @@ import {
 	Alert
 } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
-import { apiFetch, connectMobileWebSocket } from '../../src/api/client';
+import { apiFetch, createMobileWebSocket } from '../../src/api/client';
 import { t } from '../../src/i18n/strings';
 
 export default function MobileActivityScreen() {
@@ -26,7 +26,7 @@ export default function MobileActivityScreen() {
 
 	useEffect(() => {
 		loadActivity();
-		const ws = connectMobileWebSocket((event) => {
+		const ws = createMobileWebSocket((event) => {
 			if (event.type === 'notification:new') {
 				loadActivity();
 			}

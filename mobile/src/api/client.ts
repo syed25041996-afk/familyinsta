@@ -155,3 +155,5 @@ export function createMobileWebSocket(onEvent: (event: any) => void): WebSocket 
 	};
 	return ws;
 }
+
+export const connectMobileWebSocket = createMobileWebSocket;
