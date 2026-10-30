@@ -77,13 +77,20 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 	});
 
 	return json({
+		sessionToken: session.token,
+		csrfToken: session.csrfToken,
+		expiresAt: session.expiresAt.toISOString(),
 		user: {
 			id: user.id,
 			username: user.username,
+			email: user.email,
 			displayName: user.displayName,
 			role: user.role,
-			relationshipLabel: user.relationshipLabel
-		},
-		csrfToken: session.csrfToken
+			relationshipLabel: user.relationshipLabel,
+			bio: user.bio,
+			locale: user.locale,
+			textScale: user.textScale,
+			theme: user.theme
+		}
 	});
 };

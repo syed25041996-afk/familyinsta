@@ -3,9 +3,31 @@ import { SESSION_COOKIE_NAME, validateSessionToken } from '$lib/server/auth/inde
 import { ensureSchema } from '$lib/server/db/index.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Handle CORS preflight requests from Android / iOS mobile clients
+	if (event.request.method === 'OPTIONS') {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				'Access-Control-Allow-Origin': '*',
+				'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+				'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
+				'Access-Control-Max-Age': '86400'
+			}
+		});
+	}
+
 	await ensureSchema();
 
-	const token = event.cookies.get(SESSION_COOKIE_NAME);
+	// Support both Mobile Bearer Token (Authorization: Bearer <token>) and Cookie fallback
+	const authHeader = event.request.headers.get('authorization') || '';
+	const bearerToken = authHeader.startsWith('Bearer ')
+		? authHeader.slice(7).trim()
+		: undefined;
+	const token =
+		bearerToken ||
+		event.url.searchParams.get('session_token') ||
+		event.cookies.get(SESSION_COOKIE_NAME);
+
 	const validated = await validateSessionToken(token);
 
 	if (validated) {
@@ -35,15 +57,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const response = await resolve(event);
 
-	// Privacy & Security Headers: No indexing, no third-party framing, strict CSP
+	// Mobile API CORS + Privacy Headers (No indexing, no third-party trackers)
+	response.headers.set('Access-Control-Allow-Origin', '*');
+	response.headers.set(
+		'Access-Control-Allow-Headers',
+		'Content-Type, Authorization, X-CSRF-Token'
+	);
 	response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
-	response.headers.set('X-Frame-Options', 'DENY');
-	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-	response.headers.set(
-		'Permissions-Policy',
-		'camera=(self), microphone=(self), geolocation=(self), interest-cohort=()'
-	);
 
 	return response;
 };

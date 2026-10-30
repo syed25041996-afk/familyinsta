@@ -1,167 +1,151 @@
-# Kinship (FamilyGram) — Private Self-Hosted Family Social Vault
+# Kinship (familyinsta) — Native Android & iOS Family App + Self-Hosted Home Lab Server
 
-**Kinship** is a private, invite-only, Instagram-style Progressive Web App (PWA) built to run on a single home-lab server or Proxmox VM (`< 450 MB` idle RAM).
+**Kinship (`familyinsta`)** is a private, invite-only, family-only Instagram-style **native mobile app for Android and iOS** (built with React Native & Expo in [`mobile/`](./mobile)) powered by a **self-hosted Home Lab API & Media Server** running on your Proxmox VM (`http://192.168.1.103:3000`).
 
-- **100% Private**: Invite-only signup, `X-Robots-Tag: noindex, nofollow`, HMAC-SHA256 signed media URLs, zero analytics, zero third-party trackers.
-- **Family-First UX**: Chronological feed (no algorithm), 24-hour stories + Highlights, shared family albums with 1-click original `.zip` download, "On This Day" memories, 1:1 & group chats with read receipts, relationship badges (`Nani`, `Mom`, `Chacha`, `Cousin`), Child-safe accounts with Admin-approved contact circles, `A++` large text for elders, and multi-language support (**English**, **Hindi हिन्दी**, **Kannada ಕನ್ನಡ**, **Tamil தமிழ்**).
+- **Native Android & iOS App (`mobile/`)**:
+  - Native Camera & Photo/Video Library picker (`expo-image-picker`), FaceID / Fingerprint Biometric Passkeys (`expo-local-authentication`), encrypted token storage (`expo-secure-store`), native Push Notifications (`expo-notifications`), and direct ZIP album downloads (`expo-file-system` + `expo-sharing`).
+  - Configurable **Home Lab Server URL** right on the login screen (preconfigured for `http://192.168.1.103:3000` or your Tailscale/Cloudflare domain).
+  - Elder-friendly `A / A+ / A++` text scaling, Dark/Light mode, and multi-language support (**English**, **हिन्दी Hindi**, **ಕನ್ನಡ Kannada**, **தமிழ் Tamil**).
+- **Self-Hosted Home Lab Backend (`/opt/kinship` on `192.168.1.103`)**:
+  - Runs in Docker Compose (`db` PostgreSQL 16, `app` API + WebSocket server, `worker` `sharp` WebP/AVIF + `ffmpeg` H.264/HLS media processor, `backup` nightly `pg_dump` + media mirror).
+  - Uses `< 450 MB` idle RAM on your 200 GB Proxmox VM.
+  - Zero third-party cloud dependencies, zero analytics, `X-Robots-Tag: noindex, nofollow`, and HMAC-SHA256 signed media URLs.
 
 ---
 
-## 1. Quick Start (Local & Demo Mode)
+## 1. Repository Structure
 
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Seed demo family accounts, photos, stories, albums, memories & group chat
-npm run db:seed
-
-# 3. Run unit & integration tests
-npm test
-
-# 4. Start the app (http://localhost:3000)
-npm run dev
+```text
+familyinsta/
+├── mobile/                         # Native Android & iOS App (React Native + Expo Router)
+│   ├── app.json                    # Android (com.family.kinship) & iOS bundle config
+│   ├── eas.json                    # Standalone Android .apk & iOS .ipa build profiles
+│   ├── package.json
+│   ├── src/
+│   │   ├── api/client.ts           # Bearer token auth, SecureStore, chunked upload, WebSocket
+│   │   ├── context/AuthContext.tsx # User state, Home Lab URL (192.168.1.103:3000), Theme, A++ Scale
+│   │   └── i18n/strings.ts         # English, Hindi, Kannada, Tamil mobile translations
+│   └── app/
+│       ├── _layout.tsx             # Root Native Stack
+│       ├── (auth)/
+│       │   ├── login.tsx           # Home Lab Server URL selector + Password/Biometric Login
+│       │   └── invite.tsx          # One-time Invite Code Signup screen
+│       └── (tabs)/
+│           ├── index.tsx           # 24h Stories + On This Day Memories + Chronological Feed
+│           ├── search.tsx          # Search People, #Tags, Captions & Albums
+│           ├── create.tsx          # Native Camera/Gallery Picker + Post & 24h Story Uploader
+│           ├── albums.tsx          # Shared Family Albums + Original Quality .ZIP Download
+│           ├── messages.tsx        # Real-time 1:1 & Family Group Chats + Read Receipts
+│           ├── activity.tsx        # Notifications & Per-User Notification Toggles
+│           └── profile.tsx         # Profile, Relationship Badge, Highlights & Mobile Admin Panel
+├── src/                            # Self-Hosted Home Lab API & Media Worker Backend
+├── scripts/                        # Nightly backup.sh, restore.sh, and demo family seed.ts
+└── docker-compose.yml              # Proxmox VM Docker Compose stack
 ```
 
-### Demo Family Accounts (Password for all: `FamilyVault2026!`)
-| Username | Name | Relationship Badge | Role | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| `aarav` | Aarav Sharma | Admin / Son | `admin` | Full Admin Panel access (`/admin`) |
-| `nani` | Kamala Devi | Nani (Grandma) | `member` | Defaults to Hindi (`hi`) & Extra-Large Text (`A++`) |
-| `priya` | Priya Sharma | Mom | `member` | Owns the "Diwali 2026 Family Album" |
-| `rohan` | Rohan Verma | Cousin | `member` | Unapproved for Child account until Admin approves |
-| `ananya` | Ananya Sharma | Little Sister | `child` | Restricted Child circle (sees only Admin, Mom, Nani) |
-
 ---
 
-## 2. Setting Up on Your Proxmox Linux VM (200 GB Storage)
+## 2. Home Lab Server Setup on Proxmox VM (`192.168.1.103`)
 
-### Step 1: Prepare the Ubuntu / Debian VM on Proxmox
-On a fresh Debian 12 or Ubuntu 24.04 LTS VM (2 vCPU, 2–4 GB RAM, 200 GB VirtIO SCSI disk):
+### Step 1: Prepare the Ubuntu VM on Proxmox (`spera@192.168.1.103`)
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y ca-certificates curl git ufw
+sudo apt install -y ca-certificates curl git ufw openssl
 
-# Install Docker Engine & Docker Compose plugin
+# Install Docker Engine & Docker Compose plugin (if not installed)
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Step 2: Clone & Configure Environment
+### Step 2: Clone Repository & Configure Home Lab Environment
 ```bash
-git clone <your-repo-url> /opt/kinship
+sudo rm -rf /opt/kinship
+sudo git clone https://github.com/syed25041996-afk/familyinsta.git /opt/kinship
+sudo chown -R $USER:$USER /opt/kinship
 cd /opt/kinship
 cp .env.example .env
 
 # Generate strong cryptographic secrets
-sed -i "s/change_me_to_a_strong_db_password/$(openssl rand -hex 24)/" .env
-sed -i "s/change_me_to_64_hex_chars_for_session_and_csrf_signing_0123456789/$(openssl rand -hex 32)/" .env
-sed -i "s/change_me_to_64_hex_chars_for_hmac_signed_media_urls_9876543210/$(openssl rand -hex 32)/" .env
+sed -i "s/change_me_to_a_strong_db_password/$(openssl rand -hex 24)/g" .env
+sed -i "s/change_me_to_64_hex_chars_for_session_and_csrf_signing_0123456789/$(openssl rand -hex 32)/g" .env
+sed -i "s/change_me_to_64_hex_chars_for_hmac_signed_media_urls_9876543210/$(openssl rand -hex 32)/g" .env
+sed -i "s|https://family.example.com|http://192.168.1.103:3000|g" .env
 ```
 
----
-
-## 3. Network Access Modes (Choose One or Both)
-
-### Mode A (Preferred for Maximum Privacy): Private Mesh VPN (Tailscale / WireGuard)
-No ports are opened on your home router.
-1. Create a reusable or ephemeral Auth Key in your Tailscale Admin Console (`TS_AUTHKEY=tskey-auth-...`) and add it to `.env`.
-2. Start the stack with the `vpn` profile:
-   ```bash
-   docker compose --profile vpn up -d --build
-   ```
-3. Share the node with family members via Tailscale MagicDNS (e.g., `https://kinship-family.tail1234.ts.net`).
-
-### Mode B (Easiest for Non-Technical Relatives): Public Domain via Cloudflare Tunnel or Caddy HTTPS
-Relatives do not need to install a VPN client—they just open your private family domain on their phone.
-
-- **Option B1 — Cloudflare Zero-Trust Tunnel (No Open Router Ports)**:
-  1. Create a tunnel in Cloudflare Zero Trust Dashboard pointing `https://family.yourdomain.com` -> `http://app:3000`.
-  2. Paste `CLOUDFLARE_TUNNEL_TOKEN=...` into `.env`.
-  3. Launch with:
-     ```bash
-     docker compose --profile tunnel up -d --build
-     ```
-
-- **Option B2 — Direct Port-Forward (80/443) with Caddy Auto-HTTPS**:
-  1. Set `DOMAIN=family.yourdomain.com` and `ACME_EMAIL=you@yourdomain.com` in `.env`.
-  2. Allow only SSH, HTTP, and HTTPS on the VM firewall:
-     ```bash
-     sudo ufw default deny incoming
-     sudo ufw allow ssh
-     sudo ufw allow 80/tcp
-     sudo ufw allow 443/tcp
-     sudo ufw allow 443/udp
-     sudo ufw enable
-     ```
-  3. Launch with:
-     ```bash
-     docker compose --profile public up -d --build
-     ```
-
----
-
-## 4. Automated Backups, Retention & Restore Verification Test
-
-### Automated Nightly Backups
-The `kinship-backup` container runs `scripts/backup.sh` every night at **02:00 AM**:
-- Creates a compressed `pg_dump -Fc` snapshot of PostgreSQL.
-- Incrementally mirrors `/data/media` (`originals`, `display`, `thumbs`, `hls`).
-- Packages a dated `.tar.gz` archive and prunes old archives according to your retention policy (`BACKUP_KEEP_DAILY=7`, `BACKUP_KEEP_WEEKLY=4`, `BACKUP_KEEP_MONTHLY=6`).
-- Admins can also trigger an immediate backup snapshot anytime from `/admin` -> **Run Backup Now**.
-
-### Documented Restore Test Procedure
-Always test your backups! Run this verification test on your server:
-```bash
-# 1. Trigger a fresh backup inside the backup container
-docker exec kinship-backup /bin/sh /usr/local/bin/backup.sh
-
-# 2. List available backup archives
-docker exec kinship-backup ls -lh /data/backups/daily/
-
-# 3. Restore from the latest archive
-LATEST=$(docker exec kinship-backup sh -c 'ls -1t /data/backups/daily/*.tar.gz | head -n1')
-docker exec kinship-backup /bin/sh /usr/local/bin/restore.sh "$LATEST"
-
-# 4. Verify application health & media integrity
-curl -s http://localhost:3000/api/health
-```
-
----
-
-## 5. Upgrading Kinship
-
-Upgrading takes under 30 seconds and preserves all PostgreSQL data and media volumes:
+### Step 3: Start the Home Lab Backend Containers & Seed Family Data
 ```bash
 cd /opt/kinship
-git pull
-docker compose pull
 docker compose up -d --build
+
+# Seed the initial family accounts (Admin, Nani, Mom, Cousin, Child) & sample albums
+docker exec kinship-app npm run db:seed
+
+# Allow mobile devices on your LAN / Tailscale to reach port 3000
+sudo ufw allow 3000/tcp
+```
+
+Verify your Home Lab API is live at:
+```bash
+curl http://192.168.1.103:3000/api/health
 ```
 
 ---
 
-## 6. How to Add Family Members on Their Phones (Android & iOS PWA Guide)
+## 3. Running & Building the Android and iOS Mobile App (`mobile/`)
 
-### Step 1: Create a One-Time Invite Link
-1. Log in as Admin and open **🛡️ Admin** (`/admin`).
-2. Under **Generate One-Time Family Invite**, enter their relationship label (e.g., `Nani`, `Chacha`, `Mausi`, `Cousin`), choose `Member` or `Child`, and click **+ Create Invite Code**.
-3. Send them the invite link (e.g., `https://family.yourdomain.com/invite/DIWALI-2026`) on WhatsApp/SMS.
+### Option A: Run Instant Live Preview on Your Android or iPhone (Expo Go)
+1. Install **Expo Go** from the Google Play Store (Android) or Apple App Store (iPhone).
+2. On your computer (or server), run:
+   ```bash
+   cd mobile
+   npm install
+   npx expo start
+   ```
+3. Scan the QR code with your phone.
+4. On the app's Login screen, the **Home Lab Server URL** is pre-filled with `http://192.168.1.103:3000`. Tap **Connect**, then sign in or tap any Demo Family Account!
 
-### Step 2: Install to Home Screen on iPhone / iPad (iOS 16.4+)
-1. Open the invite link in **Safari** (must be Safari on iOS).
-2. Tap the **Share** button (the square with an upward arrow `⬆️` at the bottom of the screen).
-3. Scroll down and tap **Add to Home Screen** -> tap **Add**.
-4. Open the **Kinship** app icon from the iPhone Home Screen, sign in, go to the **❤️ Activity** tab, and tap **🔔 Enable Push Notifications**.
+### Option B: Build a Standalone Installable Android `.apk` (No Play Store Needed)
+You can generate a standalone `.apk` file to share directly with family members on WhatsApp or host on your server:
+```bash
+cd mobile
+npm install
 
-### Step 3: Install to Home Screen on Android
-1. Open the invite link in **Chrome** on Android.
-2. Tap the **three-dot menu (`⋮`)** in the top-right corner and tap **Add to Home screen** / **Install app**.
-3. Open **Kinship** from the Home Screen, go to **❤️ Activity**, and tap **🔔 Enable Push Notifications**.
+# Cloud APK build via EAS (free account):
+npx eas-cli build -p android --profile preview
 
-### Elder-Friendly Accessibility Tips
-- In the top bar, tap **`A` / `A+` / `A++`** to increase text size across the entire app (`A++` sets 21px base text for effortless reading without glasses).
-- Tap the language dropdown in the top bar to switch between **English**, **हिन्दी (Hindi)**, **ಕನ್ನಡ (Kannada)**, and **தமிழ் (Tamil)** anytime.
+# OR Local Android APK build (if Android SDK is installed locally):
+npx expo run:android --variant release
+```
+
+### Option C: Build for iOS (`.ipa` / Xcode)
+```bash
+cd mobile
+npm install
+npx eas-cli build -p ios --profile preview
+```
+
+---
+
+## 4. Connecting Relatives Outside Home Wi-Fi (Tailscale VPN or Cloudflare Tunnel)
+
+- **Mode A — Tailscale Mesh VPN (Zero Open Router Ports)**:
+  1. Set `TS_AUTHKEY=tskey-auth-...` in `/opt/kinship/.env` and run `docker compose --profile vpn up -d`.
+  2. In the mobile app's **Home Lab Server URL** box, enter your Tailscale IP or MagicDNS URL.
+- **Mode B — Public Domain via Cloudflare Tunnel (Easiest for Non-Technical Relatives)**:
+  1. Set `CLOUDFLARE_TUNNEL_TOKEN=...` in `/opt/kinship/.env` pointing `https://family.yourdomain.com` -> `http://app:3000`.
+  2. Run `docker compose --profile tunnel up -d`.
+  3. Relatives enter `https://family.yourdomain.com` in the mobile app's **Home Lab Server URL** field once—it is saved permanently in their phone's encrypted Keychain/Keystore.
+
+---
+
+## 5. Pre-Seeded Family Accounts (Password: `FamilyVault2026!`)
+| Username | Name | Relationship Badge | Role |
+| :--- | :--- | :--- | :--- |
+| `aarav` | Aarav Sharma | Admin / Son | `admin` (Full Mobile Admin Panel in Profile tab) |
+| `nani` | Kamala Devi | Nani (Grandma) | `member` (Hindi `hi` + `A++` Extra Large Text) |
+| `priya` | Priya Sharma | Mom | `member` |
+| `rohan` | Rohan Verma | Cousin | `member` |
+| `ananya` | Ananya Sharma | Little Sister | `child` (Restricted Child Safety Circle) |
 
 # familyinsta

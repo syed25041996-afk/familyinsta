@@ -15,8 +15,15 @@ server.on('upgrade', async (req, socket, head) => {
 	}
 
 	try {
+		const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+		const queryToken = url.searchParams.get('token');
+		const authHeader = req.headers['authorization'] || '';
+		const bearerToken = authHeader.startsWith('Bearer ')
+			? authHeader.slice(7).trim()
+			: undefined;
 		const cookies = parseCookie(req.headers.cookie || '');
-		const token = cookies['kinship_session'];
+		const token = queryToken || bearerToken || cookies['kinship_session'];
+
 		if (!token) {
 			socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
 			socket.destroy();
@@ -47,7 +54,7 @@ server.listen(port, '0.0.0.0', () => {
 		JSON.stringify({
 			timestamp: new Date().toISOString(),
 			level: 'info',
-			event: 'kinship_server_listening',
+			event: 'kinship_mobile_api_server_listening',
 			port
 		})
 	);

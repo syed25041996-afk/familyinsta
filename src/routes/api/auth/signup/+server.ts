@@ -49,11 +49,20 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		});
 
 		return json({
+			sessionToken: session.token,
+			csrfToken: session.csrfToken,
+			expiresAt: session.expiresAt.toISOString(),
 			user: {
 				id: newUser.id,
 				username: newUser.username,
+				email: newUser.email,
 				displayName: newUser.displayName,
-				role: newUser.role
+				role: newUser.role,
+				relationshipLabel: newUser.relationshipLabel,
+				bio: newUser.bio,
+				locale: newUser.locale,
+				textScale: newUser.textScale,
+				theme: newUser.theme
 			}
 		});
 	} catch (err) {

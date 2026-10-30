@@ -2,13 +2,15 @@
 
 ## 1. Executive Summary & Target Environment
 
-**FamilyGram** (working title: **Kinship**) is a self-hosted, private, family-only social network and photo/video vault designed as an installable Progressive Web App (PWA) for Android, iOS, and desktop browsers.
+**FamilyGram (`familyinsta` / Kinship)** is a self-hosted, private, family-only social network and photo/video vault consisting of:
+1. **Native Android & iOS Mobile Application (`mobile/`)**: Built with **React Native (Expo + TypeScript + Expo Router)** using native camera/gallery pickers (`expo-image-picker`), hardware biometric authentication (`expo-local-authentication`), encrypted Keychain/Keystore Bearer token storage (`expo-secure-store`), and native push notifications (`expo-notifications`).
+2. **Self-Hosted Home Lab API & Media Server (`/opt/kinship` on `192.168.1.103:3000`)**: Runs inside Docker Compose on your Proxmox VM (`db` PostgreSQL 16, `app` API + WebSocket server, `worker` `sharp`/`ffmpeg` background processor, and `backup` nightly `pg_dump` + media mirror).
 
 ### Target Home Lab Hardware Profile
 - **Host**: Desktop PC (16 GB RAM, 1 TB disk) running **Proxmox VE**.
-- **Target VM**: Linux VM allocated **200 GB storage** (thin-provisioned or LVM/ext4, expandable via Proxmox) and 2–4 GB RAM.
-- **Idle RAM Budget**: Target **< 450 MB total** across all core containers (well under the 2 GB ceiling).
-- **Zero External SaaS**: All databases, media files, queues, and push notification dispatchers run locally inside Docker Compose.
+- **Target VM**: Ubuntu Linux VM (`192.168.1.103`) with Docker Engine & Docker Compose.
+- **Idle RAM Budget**: Target **< 450 MB total** across all backend containers.
+- **Zero External SaaS**: All databases, media files, queues, and backups run locally inside Docker Compose on your Proxmox VM.
 
 ---
 
