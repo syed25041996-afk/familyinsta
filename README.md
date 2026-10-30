@@ -1,13 +1,13 @@
 # Kinship (familyinsta) — Native Android & iOS Family App + Self-Hosted Home Lab Server
 
-**Kinship (`familyinsta`)** is a private, invite-only, family-only Instagram-style **native mobile app for Android and iOS** (built with React Native & Expo in [`mobile/`](./mobile)) powered by a **self-hosted Home Lab API & Media Server** running on your Proxmox VM (`http://192.168.1.103:3000`).
+**Kinship (`familyinsta`)** is a private, invite-only, family-only Instagram-style **native mobile app for Android and iOS** (built with React Native & Expo in [`mobile/`](./mobile)) powered by a **self-hosted Home Lab API & Media Server** running on your Proxmox VM (`http://192.168.1.103:3080`).
 
 - **Native Android & iOS App (`mobile/`)**:
   - Native Camera & Photo/Video Library picker (`expo-image-picker`), FaceID / Fingerprint Biometric Passkeys (`expo-local-authentication`), encrypted token storage (`expo-secure-store`), native Push Notifications (`expo-notifications`), and direct ZIP album downloads (`expo-file-system` + `expo-sharing`).
-  - Configurable **Home Lab Server URL** right on the login screen (preconfigured for `http://192.168.1.103:3000` or your Tailscale/Cloudflare domain).
+  - Configurable **Home Lab Server URL** right on the login screen (preconfigured for `http://192.168.1.103:3080` or your Tailscale/Cloudflare domain).
   - Elder-friendly `A / A+ / A++` text scaling, Dark/Light mode, and multi-language support (**English**, **हिन्दी Hindi**, **ಕನ್ನಡ Kannada**, **தமிழ் Tamil**).
 - **Self-Hosted Home Lab Backend (`/opt/kinship` on `192.168.1.103`)**:
-  - Runs in Docker Compose (`db` PostgreSQL 16, `app` API + WebSocket server, `worker` `sharp` WebP/AVIF + `ffmpeg` H.264/HLS media processor, `backup` nightly `pg_dump` + media mirror).
+  - Runs in Docker Compose (`db` PostgreSQL 16, `app` API + WebSocket server on host port `3080`, `worker` `sharp` WebP/AVIF + `ffmpeg` H.264/HLS media processor, `backup` nightly `pg_dump` + media mirror).
   - Uses `< 450 MB` idle RAM on your 200 GB Proxmox VM.
   - Zero third-party cloud dependencies, zero analytics, `X-Robots-Tag: noindex, nofollow`, and HMAC-SHA256 signed media URLs.
 
@@ -23,7 +23,7 @@ familyinsta/
 │   ├── package.json
 │   ├── src/
 │   │   ├── api/client.ts           # Bearer token auth, SecureStore, chunked upload, WebSocket
-│   │   ├── context/AuthContext.tsx # User state, Home Lab URL (192.168.1.103:3000), Theme, A++ Scale
+│   │   ├── context/AuthContext.tsx # User state, Home Lab URL (192.168.1.103:3080), Theme, A++ Scale
 │   │   └── i18n/strings.ts         # English, Hindi, Kannada, Tamil mobile translations
 │   └── app/
 │       ├── _layout.tsx             # Root Native Stack
@@ -70,7 +70,6 @@ cp .env.example .env
 sed -i "s/change_me_to_a_strong_db_password/$(openssl rand -hex 24)/g" .env
 sed -i "s/change_me_to_64_hex_chars_for_session_and_csrf_signing_0123456789/$(openssl rand -hex 32)/g" .env
 sed -i "s/change_me_to_64_hex_chars_for_hmac_signed_media_urls_9876543210/$(openssl rand -hex 32)/g" .env
-sed -i "s|https://family.example.com|http://192.168.1.103:3000|g" .env
 ```
 
 ### Step 3: Start the Home Lab Backend Containers & Seed Family Data
@@ -81,13 +80,13 @@ docker compose up -d --build
 # Seed the initial family accounts (Admin, Nani, Mom, Cousin, Child) & sample albums
 docker exec kinship-app npm run db:seed
 
-# Allow mobile devices on your LAN / Tailscale to reach port 3000
-sudo ufw allow 3000/tcp
+# Allow mobile devices on your LAN / Tailscale to reach port 3080
+sudo ufw allow 3080/tcp
 ```
 
 Verify your Home Lab API is live at:
 ```bash
-curl http://192.168.1.103:3000/api/health
+curl http://192.168.1.103:3080/api/health
 ```
 
 ---
@@ -103,7 +102,7 @@ curl http://192.168.1.103:3000/api/health
    npx expo start
    ```
 3. Scan the QR code with your phone.
-4. On the app's Login screen, the **Home Lab Server URL** is pre-filled with `http://192.168.1.103:3000`. Tap **Connect**, then sign in or tap any Demo Family Account!
+4. On the app's Login screen, the **Home Lab Server URL** is pre-filled with `http://192.168.1.103:3080`. Tap **Connect**, then sign in or tap any Demo Family Account!
 
 ### Option B: Build a Standalone Installable Android `.apk` (No Play Store Needed)
 You can generate a standalone `.apk` file to share directly with family members on WhatsApp or host on your server:

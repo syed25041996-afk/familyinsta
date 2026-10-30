@@ -4,7 +4,7 @@
 
 **FamilyGram (`familyinsta` / Kinship)** is a self-hosted, private, family-only social network and photo/video vault consisting of:
 1. **Native Android & iOS Mobile Application (`mobile/`)**: Built with **React Native (Expo + TypeScript + Expo Router)** using native camera/gallery pickers (`expo-image-picker`), hardware biometric authentication (`expo-local-authentication`), encrypted Keychain/Keystore Bearer token storage (`expo-secure-store`), and native push notifications (`expo-notifications`).
-2. **Self-Hosted Home Lab API & Media Server (`/opt/kinship` on `192.168.1.103:3000`)**: Runs inside Docker Compose on your Proxmox VM (`db` PostgreSQL 16, `app` API + WebSocket server, `worker` `sharp`/`ffmpeg` background processor, and `backup` nightly `pg_dump` + media mirror).
+2. **Self-Hosted Home Lab API & Media Server (`/opt/kinship` on `192.168.1.103:3080`)**: Runs inside Docker Compose on your Proxmox VM (`db` PostgreSQL 16, `app` API + WebSocket server mapped to host port `3080`, `worker` `sharp`/`ffmpeg` background processor, and `backup` nightly `pg_dump` + media mirror).
 
 ### Target Home Lab Hardware Profile
 - **Host**: Desktop PC (16 GB RAM, 1 TB disk) running **Proxmox VE**.

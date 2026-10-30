@@ -4,8 +4,8 @@ import * as FileSystem from 'expo-file-system';
 const SERVER_URL_KEY = 'kinship_server_url';
 const SESSION_TOKEN_KEY = 'kinship_session_token';
 
-// Default to your Proxmox VM IP on the home network
-export const DEFAULT_HOMELAB_URL = 'http://192.168.1.103:3000';
+// Default to your Proxmox VM IP on the home network (port 3080)
+export const DEFAULT_HOMELAB_URL = 'http://192.168.1.103:3080';
 
 let cachedServerUrl = DEFAULT_HOMELAB_URL;
 let cachedToken: string | null = null;

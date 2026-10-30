@@ -116,7 +116,7 @@ export default function MobileLoginScreen() {
 						value={serverInput}
 						onChangeText={setServerInput}
 						autoCapitalize="none"
-						placeholder="http://192.168.1.103:3000"
+						placeholder="http://192.168.1.103:3080"
 						placeholderTextColor={colors.subtext}
 						style={[
 							styles.input,
